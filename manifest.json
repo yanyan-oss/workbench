@@ -2,7 +2,7 @@
   "name": "工作台",
   "short_name": "工作台",
   "description": "记录每日便签、日历与任务清单的个人工作台",
-  "start_url": "./工作台.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#F2F0E8",
