@@ -259,10 +259,7 @@
 
     <section class="card review">
       <div class="card-h"><span class="t">复盘</span><span class="count" id="review-date"></span></div>
-      <textarea id="review-text" placeholder="今天做了什么、状态怎么样…（可 1. 2. 编号写）"></textarea>
-      <div class="divider"></div>
-      <div class="lbl">改进建议（每行一条，写下后会在接下来 7 天追踪）</div>
-      <textarea id="improve-text" placeholder="改进建议：&#10;早睡半小时&#10;少刷手机"></textarea>
+      <textarea id="review-text" placeholder="今天做了什么、状态怎么样…&#10;&#10;最后另起一行写「改进建议：」，下面按 1. 2. 编号写，每条会自动进入「改进追踪」"></textarea>
     </section>
 
     <section class="card">
@@ -342,11 +339,11 @@
   let viewMonth=new Date(); viewMonth.setDate(1);
   let selected=todayStr();
 
-  function norm(d){ const o=(d&&typeof d==='object')?d:{}; return {tasks:Array.isArray(o.tasks)?o.tasks:[],reviews:(o.reviews&&typeof o.reviews==='object')?o.reviews:{},trackers:Array.isArray(o.trackers)?o.trackers:[]}; }
+  function norm(d){ const o=(d&&typeof d==='object')?d:{}; return {tasks:Array.isArray(o.tasks)?o.tasks:[],reviews:(o.reviews&&typeof o.reviews==='object')?o.reviews:{},trackers:Array.isArray(o.trackers)?o.trackers:[],updatedAt:(typeof o.updatedAt==='number')?o.updatedAt:0}; }
   function loadLocal(){ try{ return norm(JSON.parse(localStorage.getItem(KEY))); }catch(e){ return {tasks:[],reviews:{},trackers:[]}; } }
   function getCloud(){ try{ return JSON.parse(localStorage.getItem(CLOUD_KEY))||null; }catch(e){ return null; } }
   function setCloud(c){ try{ if(c) localStorage.setItem(CLOUD_KEY,JSON.stringify(c)); else localStorage.removeItem(CLOUD_KEY); }catch(e){} }
-  function save(){ try{ localStorage.setItem(KEY,JSON.stringify(data)); }catch(e){} scheduleCloudPush(); }
+  function save(){ data.updatedAt=Date.now(); try{ localStorage.setItem(KEY,JSON.stringify(data)); }catch(e){} scheduleCloudPush(); }
   function fmt(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
   function parse(s){ const p=s.split('-').map(Number); return new Date(p[0],p[1]-1,p[2]); }
   function todayStr(){ return fmt(new Date()); }
@@ -570,19 +567,37 @@
     $('#review-date').textContent=(d.getMonth()+1)+'月'+d.getDate()+'日';
     const r=data.reviews[selected]||{text:'',improvements:[]};
     $('#review-text').value=r.text||'';
-    $('#improve-text').value=(r.improvements||[]).join('\n');
+  }
+  function parseImprovements(text){
+    const out=[]; let inImp=false;
+    for(let raw of String(text||'').split('\n')){
+      const line=raw.trim();
+      if(/^改进建议\s*[:：]?\s*$/.test(line)){ inImp=true; continue; }
+      if(!inImp||!line) continue;
+      const t=line.replace(/^(?:[(（]?\s*\d{1,2}\s*[)）]\s*|\d{1,2}\s*[.、．:：]\s*)/,'').trim();
+      if(t&&!/^改进建议\s*[:：]?$/.test(t)) out.push(t);
+    }
+    return out;
+  }
+  function syncTrackers(improvements,since){
+    const imp=improvements||[]; let changed=false;
+    for(let i=data.trackers.length-1;i>=0;i--){
+      const t=data.trackers[i];
+      if(t.since===since&&t.status!=='done'&&!imp.includes(t.text)){ data.trackers.splice(i,1); changed=true; }
+    }
+    imp.forEach(text=>{
+      if(!data.trackers.some(t=>t.text===text)){
+        data.trackers.push({id:uid(),text:text,since:since,status:'active'}); changed=true;
+      }
+    });
+    return changed;
   }
   function saveReview(){
     const r=data.reviews[selected]||(data.reviews[selected]={text:'',improvements:[]});
     r.text=$('#review-text').value;
-    const imp=$('#improve-text').value.split('\n').map(s=>s.trim()).filter(Boolean);
-    r.improvements=imp;
-    imp.forEach(line=>{
-      if(!data.trackers.some(t=>t.text===line&&t.status!=='done')){
-        data.trackers.push({id:uid(),text:line,since:selected,status:'active'});
-      }
-    });
-    save(); renderCalendar();
+    r.improvements=parseImprovements(r.text);
+    syncTrackers(r.improvements,selected);
+    save(); renderCalendar(); renderTrackers();
   }
   function renderTrackers(){
     const list=activeTrackers();
@@ -665,7 +680,6 @@
 
   let rt;
   $('#review-text').addEventListener('input',()=>{ clearTimeout(rt); rt=setTimeout(saveReview,500); });
-  $('#improve-text').addEventListener('input',()=>{ clearTimeout(rt); rt=setTimeout(saveReview,500); });
 
   function addAll(){
     const v=$('#quick').value;
@@ -855,13 +869,13 @@
     try{ return norm(JSON.parse(f.content||'{}')); }catch(e){ return norm({}); }
   }
   async function writeTasks(token,gistId,payload){
-    await fetch(GH_API+'/gists/'+gistId,{method:'PATCH',headers:ghHeaders(token),
+    await fetch(GH_API+'/gists/'+gistId,{method:'PATCH',headers:ghHeaders(token),keepalive:true,
       body:JSON.stringify({files:{[GIST_FILE]:{content:JSON.stringify(payload)}}})});
   }
 
   function scheduleCloudPush(){ const c=getCloud(); if(!c||!c.token||!c.gistId) return; clearTimeout(pushTimer); pushTimer=setTimeout(()=>pushToCloud(c),600); }
   async function pushToCloud(c){
-    try{ await writeTasks(c.token,c.gistId,{tasks:data.tasks,reviews:data.reviews,trackers:data.trackers}); setSyncText('已同步 '+new Date().toLocaleTimeString()); }
+    try{ await writeTasks(c.token,c.gistId,{tasks:data.tasks,reviews:data.reviews,trackers:data.trackers,updatedAt:data.updatedAt}); setSyncText('已同步 '+new Date().toLocaleTimeString()); }
     catch(e){ setSyncText('同步失败，请检查网络'); }
   }
   function setSyncText(s){ const el=$('#sync-status'); if(el) el.textContent=s; }
@@ -875,7 +889,7 @@
     try{
       const gistId=await ensureGist(token);
       setCloud({token,gistId});
-      data=await readTasks(token,gistId);
+      data=pickData(loadLocal(), await readTasks(token,gistId));
       save(); render(); toast('已连接云同步');
       $('#sync-modal').hidden=true;
     }catch(e){
@@ -885,14 +899,38 @@
   };
   $('#sync-disconnect').onclick=()=>{ setCloud(null); $('#sync-modal').hidden=true; toast('已断开云同步'); };
 
+  function pickData(local,cloud){
+    const lu=local.updatedAt||0, cu=cloud.updatedAt||0;
+    if(lu!==cu) return lu>cu?local:cloud;
+    const size=d=>(d.tasks?d.tasks.length:0)+Object.keys(d.reviews||{}).length+(d.trackers?d.trackers.length:0);
+    return size(cloud)>=size(local)?cloud:local;
+  }
+  function reconcileReviews(){
+    let changed=false;
+    for(const d in data.reviews){
+      const r=data.reviews[d];
+      if(!r||typeof r!=='object') continue;
+      const imps=parseImprovements(r.text||'');
+      r.improvements=imps;
+      if(syncTrackers(imps,d)) changed=true;
+    }
+    return changed;
+  }
   async function boot(){
     const c=getCloud();
+    const local=loadLocal();
+    data=local;
+    let cloud=null;
     if(c&&c.token&&c.gistId){
-      try{ data=await readTasks(c.token,c.gistId); }catch(e){}
-    } else {
-      data=loadLocal();
+      try{ cloud=await readTasks(c.token,c.gistId); }catch(e){}
     }
+    if(cloud) data=pickData(local,cloud);
+    const chosenLocal=cloud?(data===local):false;
+    const changed=reconcileReviews();
+    if(chosenLocal||changed) save();
+    else { try{ localStorage.setItem(KEY,JSON.stringify(data)); }catch(e){} }
     render();
   }
+  window.addEventListener('pagehide',()=>{ const c=getCloud(); if(c&&c.token&&c.gistId){ clearTimeout(pushTimer); pushToCloud(c); } });
   boot();
 </script>
