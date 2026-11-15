@@ -60,7 +60,7 @@
   }
   button{font-family:inherit;color:inherit;cursor:pointer}
   button:focus-visible,textarea:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-  .app{max-width:1060px;margin-inline:auto}
+  .app{max-width:1200px;margin-inline:auto}
 
   header{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
     padding-bottom:16px;margin-bottom:20px;border-bottom:1px solid var(--line)}
@@ -78,6 +78,7 @@
   .btn-accent{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 
   main{display:grid;grid-template-columns:360px 1fr;gap:20px;align-items:start}
+  .wide{grid-column:1/-1}
   @media (max-width:800px){ main{grid-template-columns:1fr} }
 
   .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;overflow:hidden;
@@ -154,7 +155,7 @@
 
   /* 复盘 */
   .review textarea{width:100%;border:none;resize:vertical;background:transparent;color:var(--ink);
-    font-family:var(--font-b);font-size:15px;line-height:1.7;padding:13px 18px 4px}
+    font-family:var(--font-b);font-size:15px;line-height:1.7;padding:13px 18px 6px;min-height:150px}
   .review textarea::placeholder{color:var(--faint)}
   .review .lbl{font-size:11px;color:var(--faint);font-family:var(--font-m);letter-spacing:.02em;padding:8px 18px 0}
   .review .divider{border-top:1px dashed var(--line);margin:8px 18px 0}
@@ -260,21 +261,6 @@
       <div class="tasks" id="tasks"></div>
     </section>
 
-    <section class="card review">
-      <div class="card-h"><span class="t">复盘</span><span class="count" id="review-date"></span></div>
-      <textarea id="review-text" placeholder="今天做了什么、状态怎么样…&#10;&#10;最后另起一行写「改进建议：」，下面按 1. 2. 编号写，每条会自动进入「改进追踪」"></textarea>
-    </section>
-
-    <section class="card journal">
-      <div class="card-h"><span class="t">感恩银行</span><span class="count" id="ganen-date"></span></div>
-      <textarea id="xqx-text" placeholder="今天的小确幸，记一件存进来…"></textarea>
-    </section>
-
-    <section class="card journal">
-      <div class="card-h"><span class="t">浪前</span><span class="count" id="langqian-date"></span></div>
-      <textarea id="langqian-text" placeholder="写这里…"></textarea>
-    </section>
-
     <section class="card">
       <div class="card-h"><span class="t">改进追踪</span><span class="count" id="tracker-count"></span></div>
       <div class="tasks" id="trackers"></div>
@@ -285,6 +271,21 @@
       <div class="tasks" id="pool"></div>
     </section>
   </div>
+
+  <section class="card review wide">
+    <div class="card-h"><span class="t">复盘</span><span class="count" id="review-date"></span></div>
+    <textarea id="review-text" placeholder="今天做了什么、状态怎么样…&#10;&#10;最后另起一行写「改进建议：」，下面按 1. 2. 编号写，每条会自动进入「改进追踪」"></textarea>
+  </section>
+
+  <section class="card journal wide">
+    <div class="card-h"><span class="t">感恩银行</span><span class="count" id="ganen-date"></span></div>
+    <textarea id="xqx-text" placeholder="今天的小确幸，记一件存进来…"></textarea>
+  </section>
+
+  <section class="card journal wide">
+    <div class="card-h"><span class="t">浪前</span><span class="count" id="langqian-date"></span></div>
+    <textarea id="langqian-text" placeholder="写这里…"></textarea>
+  </section>
 </main>
 
 <div class="modal" id="modal" hidden>
@@ -575,6 +576,7 @@
       '</div></div>';
   }
 
+  function autoGrow(el){ if(!el) return; el.style.height='auto'; el.style.height=el.scrollHeight+'px'; }
   function renderReview(){
     const d=parse(selected);
     const md=(d.getMonth()+1)+'月'+d.getDate()+'日';
@@ -585,6 +587,9 @@
     $('#review-text').value=r.text||'';
     $('#xqx-text').value=r.xqx||'';
     $('#langqian-text').value=r.langqian||'';
+    autoGrow($('#review-text'));
+    autoGrow($('#xqx-text'));
+    autoGrow($('#langqian-text'));
   }
   function parseImprovements(text){
     const out=[]; let inImp=false;
@@ -699,9 +704,10 @@
   $('#tasks').addEventListener('keydown',onSubKeydown);
 
   let rt;
-  $('#review-text').addEventListener('input',()=>{ clearTimeout(rt); rt=setTimeout(saveReview,500); });
-  $('#xqx-text').addEventListener('input',()=>{ clearTimeout(rt); rt=setTimeout(saveReview,500); });
-  $('#langqian-text').addEventListener('input',()=>{ clearTimeout(rt); rt=setTimeout(saveReview,500); });
+  function onJournalInput(e){ autoGrow(e.target); clearTimeout(rt); rt=setTimeout(saveReview,500); }
+  $('#review-text').addEventListener('input',onJournalInput);
+  $('#xqx-text').addEventListener('input',onJournalInput);
+  $('#langqian-text').addEventListener('input',onJournalInput);
 
   function addAll(){
     const v=$('#quick').value;
@@ -709,10 +715,12 @@
     let added=0;
     lines.forEach(l=>{ const t=parseLine(l); if(t){ t.id=uid(); t.subs=[]; t.progress=t.progress||''; data.tasks.push(t); added++; } });
     $('#quick').value='';
+    autoGrow($('#quick'));
     if(added){ save(); render(); toast('已添加 '+added+' 条任务'); }
     else toast('没解析出任务，检查一下写法');
   }
   $('#add').onclick=addAll;
+  $('#quick').addEventListener('input',e=>autoGrow(e.target));
   $('#quick').addEventListener('keydown',e=>{ if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); addAll(); } });
 
   function renderTomorrow(){
