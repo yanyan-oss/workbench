@@ -260,6 +260,12 @@
     <section class="card review">
       <div class="card-h"><span class="t">复盘</span><span class="count" id="review-date"></span></div>
       <textarea id="review-text" placeholder="今天做了什么、状态怎么样…&#10;&#10;最后另起一行写「改进建议：」，下面按 1. 2. 编号写，每条会自动进入「改进追踪」"></textarea>
+      <div class="divider"></div>
+      <div class="lbl">小确幸</div>
+      <textarea id="xqx-text" placeholder="今天让你开心的小事…"></textarea>
+      <div class="divider"></div>
+      <div class="lbl">浪前</div>
+      <textarea id="langqian-text" placeholder="写这里…"></textarea>
     </section>
 
     <section class="card">
@@ -567,6 +573,8 @@
     $('#review-date').textContent=(d.getMonth()+1)+'月'+d.getDate()+'日';
     const r=data.reviews[selected]||{text:'',improvements:[]};
     $('#review-text').value=r.text||'';
+    $('#xqx-text').value=r.xqx||'';
+    $('#langqian-text').value=r.langqian||'';
   }
   function parseImprovements(text){
     const out=[]; let inImp=false;
@@ -595,6 +603,8 @@
   function saveReview(){
     const r=data.reviews[selected]||(data.reviews[selected]={text:'',improvements:[]});
     r.text=$('#review-text').value;
+    r.xqx=$('#xqx-text').value;
+    r.langqian=$('#langqian-text').value;
     r.improvements=parseImprovements(r.text);
     syncTrackers(r.improvements,selected);
     save(); renderCalendar(); renderTrackers();
@@ -680,6 +690,8 @@
 
   let rt;
   $('#review-text').addEventListener('input',()=>{ clearTimeout(rt); rt=setTimeout(saveReview,500); });
+  $('#xqx-text').addEventListener('input',()=>{ clearTimeout(rt); rt=setTimeout(saveReview,500); });
+  $('#langqian-text').addEventListener('input',()=>{ clearTimeout(rt); rt=setTimeout(saveReview,500); });
 
   function addAll(){
     const v=$('#quick').value;
@@ -753,6 +765,8 @@
         lines.push('▍'+(dd.getMonth()+1)+'月'+dd.getDate()+'日 星期'+WD[dd.getDay()]);
         lines.push(r.text.trim());
         if(r.improvements&&r.improvements.length) lines.push('改进建议：'+r.improvements.join('；'));
+        if(r.xqx&&r.xqx.trim()) lines.push('小确幸：'+r.xqx.trim());
+        if(r.langqian&&r.langqian.trim()) lines.push('浪前：'+r.langqian.trim());
         lines.push('');
       }
       d=addDays(d,1);

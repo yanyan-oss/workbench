@@ -1,7 +1,7 @@
-name: 每日推送明日待办
+name: 每日23点推送明日待办
 on:
   schedule:
-    - cron: '0 15 * * *'   # 北京时间 23:00（UTC 15:00）
+    - cron: '0 15 * * *'   # UTC 15:00 = 北京时间 23:00
   workflow_dispatch: {}      # 支持手动测试
 
 jobs:
@@ -13,7 +13,7 @@ jobs:
         with:
           node-version: 20
       - name: 推送明日待办
-        run: node push-tomorrow.js
+        run: node push-tomorrow.js tomorrow
         env:
           GIST_PAT: ${{ secrets.GIST_PAT }}
           SENDKEY: ${{ secrets.SENDKEY }}

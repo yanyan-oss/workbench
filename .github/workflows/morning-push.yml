@@ -1,0 +1,19 @@
+name: 每日6点推送今日待办
+on:
+  schedule:
+    - cron: '0 22 * * *'   # UTC 22:00 = 北京时间次日 06:00
+  workflow_dispatch: {}      # 支持手动测试
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: 推送今日待办
+        run: node push-tomorrow.js today
+        env:
+          GIST_PAT: ${{ secrets.GIST_PAT }}
+          SENDKEY: ${{ secrets.SENDKEY }}
